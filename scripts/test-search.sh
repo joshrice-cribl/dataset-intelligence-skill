@@ -14,10 +14,10 @@ AUTH="Authorization: Bearer $TOKEN"
 echo "OK: token acquired"
 
 echo
-echo "== Create search job: dataset=\"$DS\" | limit 5"
+echo "== Create search job: cribl dataset=\"$DS\" | limit 5"
 JOB=$(curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
   "$BASE/api/v1/m/default_search/search/jobs" \
-  -d "{\"query\":\"dataset=\\\"$DS\\\" | limit 5\",\"earliest\":\"-1h\",\"latest\":\"now\"}")
+  -d "{\"query\":\"cribl dataset=\\\"$DS\\\" | limit 5\",\"earliest\":\"-1h\",\"latest\":\"now\"}")
 echo "$JOB" | head -c 600; echo
 JOB_ID=$(echo "$JOB" | python3 -c 'import json,sys
 try:
@@ -29,10 +29,10 @@ if [ -z "$JOB_ID" ]; then echo "FAIL: no job id"; exit 1; fi
 echo "OK: job id = $JOB_ID"
 
 echo
-echo "== Poll job status"
+echo "== Poll job status (documented /status endpoint)"
 for i in $(seq 1 12); do
   sleep 5
-  ST=$(curl -s -H "$AUTH" "$BASE/api/v1/m/default_search/search/jobs/$JOB_ID" \
+  ST=$(curl -s -H "$AUTH" "$BASE/api/v1/m/default_search/search/jobs/$JOB_ID/status" \
     | python3 -c 'import json,sys
 b=json.load(sys.stdin); it=(b.get("items") or [b])[0]
 print(it.get("status",""))' 2>/dev/null)

@@ -92,9 +92,10 @@ any KQL. It contains, in order:
   status / timestamp. Use these to translate the question into field names.
 
 Generated files may also include **Starter Queries** and an **Investigation
-Playbook** section with ready-to-run KQL. Note: starter queries may begin with
-the implicit `cribl` command (`cribl dataset=...`) — when submitting via the
-API, `dataset="..."` alone works.
+Playbook** section with ready-to-run KQL. Starter queries begin with the
+`cribl` command (`cribl dataset=...`) — keep that prefix when submitting via
+the API, as the Search API guide instructs (a bare `dataset=...` also executes,
+but the prefixed form is the documented contract).
 
 Inject the full markdown into the model's context, then compose the query.
 
@@ -104,7 +105,7 @@ If Step 1 returned no usable content, do what Cribl's own investigation agent
 does: sample the dataset first, then compose.
 
 ```
-dataset="<dataset-id>" | limit 100
+cribl dataset="<dataset-id>" | limit 100
 ```
 
 Run that as a search (Step 4), inspect the field shapes from the results, and
@@ -121,21 +122,29 @@ curl -s -X POST -H "Authorization: Bearer $CRIBL_TOKEN" \
 ## Step 4 — Run the search
 
 ```bash
-# Create the search job
+# Create the search job. Per the Search API guide, begin the query with the
+# `cribl` operator. (Double quotes so $DATASET_ID expands; inner quotes escaped.)
 curl -s -X POST -H "Authorization: Bearer $CRIBL_TOKEN" \
   -H "Content-Type: application/json" \
   "$CRIBL_BASE_URL/api/v1/m/default_search/search/jobs" \
-  -d '{"query": "dataset=\"$DATASET_ID\" | where status != \"allow\" | limit 100", "earliest": "-24h", "latest": "now"}'
+  -d "{\"query\": \"cribl dataset=\\\"$DATASET_ID\\\" | limit 100\", \"earliest\": \"-24h\", \"latest\": \"now\"}"
 
-# Returns {"items":[{"id":"<job-id>", ...}]} — then fetch results:
+# Returns {"items":[{"id":"<job-id>", ...}]} — poll the documented status
+# endpoint until status is "completed":
 curl -s -H "Authorization: Bearer $CRIBL_TOKEN" \
-  "$CRIBL_BASE_URL/api/v1/m/default_search/search/jobs/<job-id>/results?limit=100"
+  "$CRIBL_BASE_URL/api/v1/m/default_search/search/jobs/<job-id>/status"
+
+# Then fetch results (paginate with limit/offset):
+curl -s -H "Authorization: Bearer $CRIBL_TOKEN" \
+  "$CRIBL_BASE_URL/api/v1/m/default_search/search/jobs/<job-id>/results?limit=100&offset=0"
 ```
 
 Results come back as **NDJSON**: the first line is a header object
 (`totalEventCount`, `isFinished`, ...) and each following line is one event.
-Poll the job (`GET .../search/jobs/<job-id>`) until `status: completed` before
-fetching final results.
+
+Verified against prod (Nov 2025): the query also executes without the `cribl`
+prefix, and `GET .../search/jobs/<job-id>` also returns the `status` field —
+but prefer the documented forms above.
 
 KQL quick rules (the DSI field rules override these where they conflict):
 `==` not `=`; `or` not `||`; `summarize total=count() by field` (no `as`);
